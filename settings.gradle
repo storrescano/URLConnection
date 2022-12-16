@@ -14,3 +14,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "URLConnection"
 include ':app'
+include ':mylibrary'
+include ':app:mylibrary'
+include ':mylibrary2'

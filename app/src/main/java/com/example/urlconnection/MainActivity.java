@@ -1,91 +1,68 @@
 package com.example.urlconnection;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import android.app.AlertDialog;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
 
-import java.io.BufferedReader;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.urlconnection.databinding.ActivityMainBinding;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String DEBUG_TAG = "HttpExample";
-    private EditText urlText;
-    private TextView textView;
-    private Button download;
-
+    ActivityMainBinding mBinding;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        urlText = findViewById(R.id.URLInsert);
-        textView = findViewById(R.id.web);
-        download = findViewById(R.id.download);
-
-
-        download.setOnClickListener(v-> {
-            String stringUrl = urlText.getText().toString();
+        mBinding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(mBinding.getRoot());
+        mBinding.download.setOnClickListener(v -> {
+            String stringUrl = mBinding.URLInsert.getText().toString();
             ConnectivityManager connMgr = (ConnectivityManager)
                     getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
             if (networkInfo != null && networkInfo.isConnected()) {
-                new DownloadWebpageText().execute(stringUrl);
+                String web;
+                //new Thread(() -> {
+                    try {
+                        web = downloadUrl(stringUrl);
+                        mBinding.web.setText(web);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                //}).start();
             } else {
-                textView.setText("No network connection available.");
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                builder.setMessage("CANT CONNECT TO THE INTERNET");
+                builder.show();
             }
         });
     }
 
-    private class DownloadWebpageText extends AsyncTask {
-
-        @Override
-        protected String doInBackground(String... urls) {
-
-            // params comes from the execute() call: params[0] is the url.
-            try {
-                return downloadUrl(urls[0]);
-            } catch (IOException e) {
-                return "Unable to retrieve web page. URL may be invalid.";
-            }
+    public String readIt(InputStream stream) throws IOException {
+        Reader reader = new InputStreamReader(stream, "UTF-8");
+        StringBuilder sb = new StringBuilder();
+        int k;
+        while ((k = reader.read()) != -1) {
+            sb.append((char)k);
         }
-        // onPostExecute displays the results of the AsyncTask.
-        protected void onPostExecute(String result) {
-            textView.setText(result);
-        }
-
-        @Override
-        protected Object doInBackground(Object[] objects) {
-
-            // params comes from the execute() call: params[0] is the url.
-            try {
-                return downloadUrl(urls[0]);
-            } catch (IOException e) {
-                return "Unable to retrieve web page. URL may be invalid.";
-            }
-        }
+        return sb.toString();
     }
 
     private String downloadUrl(String myurl) throws IOException {
         InputStream is = null;
-        // Only display the first 500 characters of the retrieved
-        // web page content.
-        int len = 500;
 
         try {
             URL url = new URL(myurl);
@@ -96,34 +73,14 @@ public class MainActivity extends AppCompatActivity {
             conn.setDoInput(true);
             // Starts the query
             conn.connect();
-            int response = conn.getResponseCode();
-            Log.d(DEBUG_TAG, "The response is: " + response);
             is = conn.getInputStream();
+            return readIt(is);
 
-            // Convert the InputStream into a string
-            String contentAsString = readIt(is, len);
-            return contentAsString;
-
-            // Makes sure that the InputStream is closed after the app is
-            // finished using it.
         } finally {
             if (is != null) {
                 is.close();
             }
         }
     }
-
-    public String readIt(InputStream stream, int len) throws IOException, UnsupportedEncodingException {
-        Reader reader = null;
-        reader = new InputStreamReader(stream, "UTF-8");
-        char[] buffer = new char[len];
-        reader.read(buffer);
-        return new String(buffer);
-    }
-
-
 }
-
-
-
 
