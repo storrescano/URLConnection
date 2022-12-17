@@ -1,10 +1,12 @@
 package com.example.urlconnection;
 
-import android.app.AlertDialog;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -15,8 +17,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.ProtocolException;
 import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
@@ -28,27 +28,27 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         mBinding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(mBinding.getRoot());
-        mBinding.download.setOnClickListener(v -> {
-            String stringUrl = mBinding.URLInsert.getText().toString();
-            ConnectivityManager connMgr = (ConnectivityManager)
-                    getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-            if (networkInfo != null && networkInfo.isConnected()) {
-                String web;
-                //new Thread(() -> {
-                    try {
-                        web = downloadUrl(stringUrl);
-                        mBinding.web.setText(web);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                //}).start();
-            } else {
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setMessage("CANT CONNECT TO THE INTERNET");
-                builder.show();
-            }
-        });
+        mBinding.URLInsert.setText(getResources().getText(R.string.http));
+        mBinding.download.setOnClickListener(this::connect);
+    }
+
+    private void connect(View view) {
+        String path = String.valueOf(mBinding.URLInsert.getText());
+        ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        if(networkInfo != null && networkInfo.isConnected()) {
+            new Thread(() -> {
+                String response = downloadUrl(path);
+                if(response != null) {
+                    mBinding.web.setText(cleanText(response));
+                } else {
+                    mBinding.web.setText("Ocurrió un error durante la conexión");
+                }
+
+            }).start();
+        } else {
+            Toast.makeText(this, "No hay conexiones de red habilitadas", Toast.LENGTH_SHORT).show();
+        }
     }
 
     public String readIt(InputStream stream) throws IOException {
@@ -61,26 +61,33 @@ public class MainActivity extends AppCompatActivity {
         return sb.toString();
     }
 
-    private String downloadUrl(String myurl) throws IOException {
-        InputStream is = null;
-
+    private String downloadUrl(String urlCliente) {
+        URL url;
+        HttpURLConnection conn;
+        String contentAsString = null;
         try {
-            URL url = new URL(myurl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setReadTimeout(10000 /* milliseconds */);
-            conn.setConnectTimeout(15000 /* milliseconds */);
+            url = new URL(urlCliente);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setReadTimeout(10000);
+            conn.setConnectTimeout(15000);
             conn.setRequestMethod("GET");
             conn.setDoInput(true);
-            // Starts the query
             conn.connect();
-            is = conn.getInputStream();
-            return readIt(is);
 
-        } finally {
-            if (is != null) {
-                is.close();
+            try(InputStream is = conn.getInputStream()) {
+                contentAsString = readIt(is);
             }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        return contentAsString;
+    }
+
+    private String cleanText(String dom) {
+        int initPos = dom.indexOf("articleContent");
+        initPos = dom.indexOf(">", initPos) + 1;
+        int endPos = dom.indexOf("</div>", initPos);
+        return dom.substring(initPos, endPos).replaceAll("<[^>]*>", "");
     }
 }
 
